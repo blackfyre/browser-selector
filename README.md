@@ -76,33 +76,6 @@ sudo zypper install zenity jq libnotify-tools
    ./select-browser.sh --set-default
    ```
 
-### Manual Installation
-
-1. **Clone or download the repository:**
-
-   ```bash
-   git clone https://github.com/yourusername/browser-selector.git
-   cd browser-selector
-   ```
-
-2. **Make the script executable:**
-
-   ```bash
-   chmod +x select-browser.sh
-   ```
-
-3. **Create desktop integration:**
-
-   ```bash
-   ./select-browser.sh --install
-   ```
-
-4. **Set as default browser (optional):**
-
-   ```bash
-   ./select-browser.sh --set-default
-   ```
-
 ### System-wide Installation
 
 For system-wide availability:
