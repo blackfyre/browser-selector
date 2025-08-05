@@ -108,7 +108,7 @@ Examples:
 Configuration:
   ~/.config/browser-selector/config.json
 
-Report issues: https://github.com/yourusername/browser-selector
+Report issues: https://github.com/blackfyre/browser-selector
 EOF
     exit 0
 fi
@@ -311,12 +311,13 @@ detect_browsers() {
     # Arrays to temporarily hold output for browsers and desktop file assignments
     local browser_output=()
     local desktop_file_assignments=()
+    local found_browsers=()  # Store all found browsers first
     local first_browser=true  # Default first browser to true initially
 
     # If we have a last choice, we'll mark it TRUE and all others FALSE
     # If no last choice, we'll mark the first one TRUE
 
-    # Search for browser desktop files
+    # First pass: collect all browsers
     for path in "${search_paths[@]}"; do
         if [[ -d "$path" ]]; then
             for desktop_file in "$path"/*.desktop; do
@@ -328,45 +329,70 @@ detect_browsers() {
                         # Extract executable from desktop file
                         local exec_line=$(grep "^Exec=" "$desktop_file" | head -1)
                         if [[ -n "$exec_line" ]]; then
-                            # Skip if already added (check against the list to be outputted)
+                            # Skip if already added
                             local already_added=false
-                            for ((i=2; i<${#browser_output[@]}; i+=4)); do
-                                if [[ "${browser_output[i]}" == "$basename" ]]; then
+                            for found_browser in "${found_browsers[@]}"; do
+                                if [[ "$found_browser" == "$basename" ]]; then
                                     already_added=true
                                     break
                                 fi
                             done
 
                             if [[ "$already_added" == false ]]; then
-                                local info="${browser_info[$basename]}"
-                                local icon_name="${info%%|*}"
-                                local description="${info##*|}"
-
-                                # Prepare the assignment string for the global array.
-                                # IMPORTANT: Quote the desktop_file variable to handle spaces/special characters correctly.
+                                found_browsers+=("$basename")
+                                
+                                # Prepare the assignment string for the global array
                                 desktop_file_assignments+=("desktop_file_paths[\"$basename\"]=\"$desktop_file\"")
-
-                                # Set TRUE if this matches last used browser or if it's the first one and we have no last choice
-                                if [[ "$basename" == "$LAST_BROWSER" ]]; then
-                                    browser_output+=("TRUE")
-                                    first_browser=false  # No longer need to mark first browser as true
-                                elif [[ "$first_browser" == true && -z "$LAST_BROWSER" ]]; then
-                                    browser_output+=("TRUE")
-                                    first_browser=false
-                                else
-                                    browser_output+=("FALSE")
-                                fi
-                                browser_output+=("$icon_name")       # Column 2: Display name with icon
-                                browser_output+=("$basename")        # Column 3: Desktop file ID (hidden, returned)
-                                browser_output+=("$description")     # Column 4: Description
                             fi
                         fi
                     fi
-                    # For debugging - uncomment to see all desktop files
-                    # echo "DEBUG: Checking desktop file: $desktop_file (basename: $basename)" >&2
                 fi
             done
         fi
+    done
+
+    # Second pass: output browsers with last used browser first
+    local last_browser_found=false
+    
+    # If we have a last browser, output it first
+    if [[ -n "$LAST_BROWSER" ]]; then
+        for basename in "${found_browsers[@]}"; do
+            if [[ "$basename" == "$LAST_BROWSER" ]]; then
+                local info="${browser_info[$basename]}"
+                local icon_name="${info%%|*}"
+                local description="${info##*|}"
+                
+                browser_output+=("TRUE")  # Mark as selected
+                browser_output+=("$icon_name")
+                browser_output+=("$basename")
+                browser_output+=("$description")
+                last_browser_found=true
+                break
+            fi
+        done
+    fi
+    
+    # Then output all other browsers
+    for basename in "${found_browsers[@]}"; do
+        # Skip if this is the last browser (already added first)
+        if [[ "$basename" == "$LAST_BROWSER" ]]; then
+            continue
+        fi
+        
+        local info="${browser_info[$basename]}"
+        local icon_name="${info%%|*}"
+        local description="${info##*|}"
+        
+        # Set TRUE only if this is the first browser and no last browser was found
+        if [[ "$last_browser_found" == false && "$first_browser" == true ]]; then
+            browser_output+=("TRUE")
+            first_browser=false
+        else
+            browser_output+=("FALSE")
+        fi
+        browser_output+=("$icon_name")
+        browser_output+=("$basename")
+        browser_output+=("$description")
     done
 
     # Output the browser info for zenity
